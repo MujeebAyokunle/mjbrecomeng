@@ -23,6 +23,6 @@ func main() {
 	fmt.Println("Welcome to GetZing")
 	r := router.Router()
 	fmt.Println("Running at port ", port)
-	log.Fatal(http.ListenAndServe(":5000", r))
+	log.Fatal(http.ListenAndServe(":"+port, r))
 	fmt.Println("Running at port ", port)
 }
