@@ -524,3 +524,134 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonStr)
 
 }
+
+func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Allow-Content-Allow-Methods", "POST")
+
+	type GorseRecommendSchema struct {
+		UserId   string `json:"userId"`
+		Category string `json:"category"`
+		Length   int    `json:"length"`
+		Platform string `json:"platform"`
+	}
+
+	bodyByte, bodyErr := io.ReadAll(r.Body)
+
+	if bodyErr != nil {
+		log.Fatal(bodyErr)
+		errbyte, _ := json.Marshal(&ErrorSchema{"error", "Something went wrong"})
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(errbyte)
+		return
+	}
+
+	var reqBody GorseRecommendSchema
+
+	reqerr := json.Unmarshal(bodyByte, &reqBody)
+
+	if reqerr != nil {
+		errBody := &ErrorSchema{"error", "userId must be a string, category must be string, and length must be an integer"}
+		w.WriteHeader(http.StatusBadRequest)
+		errByte, _ := json.Marshal(errBody)
+		w.Write(errByte)
+		return
+	}
+
+	if (reqBody.UserId == "") || reqBody.Category == "" || reqBody.Length == 0 {
+		errBody := &ErrorSchema{"error", "user id, category, and recommendation length are required"}
+		w.WriteHeader(http.StatusBadRequest)
+		errByte, _ := json.Marshal(errBody)
+		w.Write(errByte)
+		return
+	}
+
+	userApiUrl := "http://gorse:8088/api/user/" + reqBody.UserId
+
+	var newUser bool
+
+	_, userStatusCode := miscelaneous.GetRequest(userApiUrl)
+
+	if userStatusCode != 200 {
+		type userSchema struct {
+			UserId    string
+			Comment   string
+			Labels    []string
+			Subscribe []string
+		}
+
+		platform := []string{reqBody.Platform}
+		createUserUrl := "http://gorse:8088/api/user"
+
+		data := &userSchema{UserId: reqBody.UserId, Labels: platform}
+		dataByte, _ := json.Marshal(data)
+		_, resStatusCode := miscelaneous.PostRequest(createUserUrl, dataByte)
+
+		if resStatusCode != 200 {
+			w.WriteHeader(http.StatusOK)
+			jsonResp := &ErrorSchema{"error", "Error adding user. User does not exist"}
+			jsonStr, _ := json.Marshal(jsonResp)
+
+			w.Write(jsonStr)
+			return
+		}
+
+		newUser = true
+	} else {
+		newUser = false
+	}
+
+	// Create a client
+	gorse := client.NewGorseClient("http://gorse:8088", "")
+
+	recommendations, recErr := gorse.GetRecommend(context.TODO(), reqBody.UserId, reqBody.Category, reqBody.Length)
+
+	type recommendationSchema struct {
+		Categories []string `json:"categories"`
+		Comment    string   `json:"comment"`
+		IsHidden   bool     `json:"isHidden"`
+		ItemId     string   `json:"itemId"`
+		Labels     []string `json:"labels"`
+		Timestamp  string   `json:"timestamp"`
+	}
+
+	var recomendationsDetails []recommendationSchema
+
+	for _, rec := range recommendations {
+
+		apiUrl := "http://gorse:8088/api/item/" + rec
+
+		resp, statusCode := miscelaneous.GetRequest(apiUrl)
+
+		if statusCode != 200 {
+			w.WriteHeader(http.StatusBadRequest)
+			jsonResp := &ErrorSchema{"error", "Error fetching recommendation details"}
+			jsonStr, _ := json.Marshal(jsonResp)
+
+			w.Write(jsonStr)
+		}
+
+		var recomendationDetail recommendationSchema
+
+		json.Unmarshal(resp, &recomendationDetail)
+
+		recomendationsDetails = append(recomendationsDetails, recomendationDetail)
+	}
+
+	miscelaneous.ErrorLogger(recErr)
+
+	type SuccessSchema struct {
+		Status                 string                 `json:"status"`
+		Recommendations        []string               `json:"recommendations"`
+		RecommendationsDetails []recommendationSchema `json:"recommendationsdetails"`
+		UserId                 string                 `json:"userid"`
+		NewUser                bool                   `json:"newUser"`
+	}
+
+	w.WriteHeader(http.StatusOK)
+	jsonResp := &SuccessSchema{"success", recommendations, recomendationsDetails, reqBody.UserId, newUser}
+	jsonStr, _ := json.Marshal(jsonResp)
+
+	w.Write(jsonStr)
+
+}

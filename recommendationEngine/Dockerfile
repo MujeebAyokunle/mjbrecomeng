@@ -22,7 +22,7 @@ RUN go build -o main main.go
 
 # RUN main --no-cache add ca-certificates
 
-EXPOSE 5000
+EXPOSE 6000
 
 CMD ["/engine/main"]
 

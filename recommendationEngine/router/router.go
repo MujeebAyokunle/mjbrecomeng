@@ -13,7 +13,8 @@ func Router() *mux.Router {
 	router.HandleFunc("/gorse/adduser", helpers.GorseAddUser).Methods("POST")
 	router.HandleFunc("/gorse/addfeedback", helpers.GorseAddFeedback).Methods("POST")
 	router.HandleFunc("/gorse/recommend", helpers.GorseRecommend).Methods("POST")
-	router.HandleFunc("/gorse/apirecommend", helpers.GorseApiRecommend).Methods("POST")
+	router.HandleFunc("/gorse/timedrecommend", helpers.GorseApiRecommend).Methods("POST")
+	router.HandleFunc("/gorse/recommend/details", helpers.GorseFullRecommend).Methods("POST")
 
 	return router
 }

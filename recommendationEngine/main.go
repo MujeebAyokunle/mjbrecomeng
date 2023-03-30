@@ -18,7 +18,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var port = os.Getenv("PORT")
+	var port = os.Getenv("port")
 
 	fmt.Println("Welcome to GetZing")
 	r := router.Router()
