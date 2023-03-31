@@ -195,7 +195,7 @@ read_replacement_decay = 0.6
 check_recommend_period = "1m"
 
 # The time period to refresh recommendation for inactive users. The default values is 120h.
-refresh_recommend_period = "24h"
+refresh_recommend_period = "1m"
 
 # Enable latest recommendation during offline recommendation. The default value is false.
 enable_latest_recommend = true
