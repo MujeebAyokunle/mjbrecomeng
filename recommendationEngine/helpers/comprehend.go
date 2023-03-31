@@ -7,8 +7,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"recommendation-system/miscelaneous"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,8 +20,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/comprehend"
+
 	"github.com/zhenghaoz/gorse/client"
 )
+
+var baseUrl string = os.Getenv("baseUrl")
 
 type ErrorSchema struct {
 	Status  string `json:"status"`
@@ -69,7 +74,14 @@ func ComprehendFunc(w http.ResponseWriter, r *http.Request) {
 	miscelaneous.ErrorLogger(err)
 
 	payloaderr := json.Unmarshal(body, &payload)
-	miscelaneous.ErrorLogger(payloaderr)
+	if payloaderr != nil {
+		log.Fatal(payloaderr)
+		errBody := &ErrorSchema{"error", "Data type error"}
+		w.WriteHeader(http.StatusBadRequest)
+		errByte, _ := json.Marshal(errBody)
+		w.Write(errByte)
+		return
+	}
 
 	if payload.Goal == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -189,25 +201,39 @@ func GorseAddItem(w http.ResponseWriter, r *http.Request) {
 
 	reqerr := json.Unmarshal(bodyByte, &reqBody)
 
-	miscelaneous.ErrorLogger(reqerr)
-
-	if (reqBody.ItemId == "") || reqBody.Comment == "" || len(reqBody.Categories) == 0 || len(reqBody.Labels) == 0 || reqBody.Timestamp == "" {
-		errBody := &ErrorSchema{"error", "item id, comment, category, labels, ishidden, and timestamp are required"}
+	if reqerr != nil {
+		log.Fatal(reqerr)
+		errBody := &ErrorSchema{"error", "Data type error"}
 		w.WriteHeader(http.StatusBadRequest)
 		errByte, _ := json.Marshal(errBody)
 		w.Write(errByte)
 		return
 	}
 
+	if (reqBody.ItemId == "") || reqBody.Comment == "" || len(reqBody.Categories) == 0 || len(reqBody.Labels) == 0 || reqBody.Timestamp == "" {
+		errBody := &ErrorSchema{"error", "itemId, comment, categories, labels, isHidden, and timeStamp are required"}
+		w.WriteHeader(http.StatusBadRequest)
+		errByte, _ := json.Marshal(errBody)
+		w.Write(errByte)
+		return
+	}
+
+	var loweCaseLabels []string
+
+	for _, data := range reqBody.Labels {
+		loweCaseLabels = append(loweCaseLabels, strings.ToLower(data))
+	}
+
 	// Create a client
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	fmt.Println("http://localhost:8088")
+	gorse := client.NewGorseClient("http://localhost:8088", "")
 
 	affected, _ := gorse.InsertItem(context.TODO(), client.Item{
 		ItemId:     reqBody.ItemId,
 		IsHidden:   reqBody.IsHidden,
 		Categories: reqBody.Categories,
 		Timestamp:  reqBody.Timestamp,
-		Labels:     reqBody.Labels,
+		Labels:     loweCaseLabels,
 		Comment:    reqBody.Comment,
 	})
 
@@ -257,7 +283,14 @@ func GorseAddUser(w http.ResponseWriter, r *http.Request) {
 
 	reqerr := json.Unmarshal(bodyByte, &reqBody)
 
-	miscelaneous.ErrorLogger(reqerr)
+	if reqerr != nil {
+		log.Fatal(reqerr)
+		errBody := &ErrorSchema{"error", "Data type error"}
+		w.WriteHeader(http.StatusBadRequest)
+		errByte, _ := json.Marshal(errBody)
+		w.Write(errByte)
+		return
+	}
 
 	if (reqBody.UserId == "") || reqBody.Platform == "" {
 		errBody := &ErrorSchema{"error", "user id, and platform are required"}
@@ -268,7 +301,7 @@ func GorseAddUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a client
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	gorse := client.NewGorseClient("http://localhost:8088", "")
 
 	affected, _ := gorse.InsertUser(context.TODO(), client.User{
 		Labels: []string{reqBody.Platform},
@@ -323,7 +356,14 @@ func GorseAddFeedback(w http.ResponseWriter, r *http.Request) {
 
 	reqerr := json.Unmarshal(bodyByte, &reqBody)
 
-	miscelaneous.ErrorLogger(reqerr)
+	if reqerr != nil {
+		log.Fatal(reqerr)
+		errBody := &ErrorSchema{"error", "Data type error"}
+		w.WriteHeader(http.StatusBadRequest)
+		errByte, _ := json.Marshal(errBody)
+		w.Write(errByte)
+		return
+	}
 
 	if (reqBody.UserId == "") || reqBody.FeedbackType == "" || reqBody.ItemId == "" || reqBody.Timestamp == "" {
 		errBody := &ErrorSchema{"error", "user id, feedback type, item id, and timestamp are required"}
@@ -334,7 +374,7 @@ func GorseAddFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a client
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	gorse := client.NewGorseClient("http://localhost:8088", "")
 
 	affected, _ := gorse.InsertFeedback(context.TODO(), []client.Feedback{
 		{
@@ -389,7 +429,14 @@ func GorseRecommend(w http.ResponseWriter, r *http.Request) {
 
 	reqerr := json.Unmarshal(bodyByte, &reqBody)
 
-	miscelaneous.ErrorLogger(reqerr)
+	if reqerr != nil {
+		log.Fatal(reqerr)
+		errBody := &ErrorSchema{"error", "Data type error"}
+		w.WriteHeader(http.StatusBadRequest)
+		errByte, _ := json.Marshal(errBody)
+		w.Write(errByte)
+		return
+	}
 
 	if (reqBody.UserId == "") || reqBody.Category == "" || reqBody.Length == 0 {
 		errBody := &ErrorSchema{"error", "user id, category, and recommendation length are required"}
@@ -400,7 +447,7 @@ func GorseRecommend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a client
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	gorse := client.NewGorseClient("http://localhost:8088", "")
 
 	recommendations, recErr := gorse.GetRecommend(context.TODO(), reqBody.UserId, reqBody.Category, reqBody.Length)
 
@@ -447,7 +494,14 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 
 	reqerr := json.Unmarshal(bodyByte, &reqBody)
 
-	miscelaneous.ErrorLogger(reqerr)
+	if reqerr != nil {
+		log.Fatal(reqerr)
+		errBody := &ErrorSchema{"error", "Data type error"}
+		w.WriteHeader(http.StatusBadRequest)
+		errByte, _ := json.Marshal(errBody)
+		w.Write(errByte)
+		return
+	}
 
 	if (reqBody.UserId == "") || reqBody.Category == "" || reqBody.Platform == "" || reqBody.DelayMins == 0 || reqBody.WriteBackType == "" || reqBody.Length == 0 {
 		errBody := &ErrorSchema{"errorsss", "user id, category, write-back-type, platform, delay-minutes and recommendation length are required"}
@@ -457,7 +511,7 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userApiUrl := "http://gorse:8088/api/user/" + reqBody.UserId
+	userApiUrl := "http://localhost:8088/api/user/" + reqBody.UserId
 
 	var newUser bool
 
@@ -472,7 +526,7 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 		}
 
 		platform := []string{reqBody.Platform}
-		createUserUrl := "http://gorse:8088/api/user"
+		createUserUrl := "http://localhost:8088/api/user"
 
 		data := &userSchema{UserId: reqBody.UserId, Labels: platform}
 		dataByte, _ := json.Marshal(data)
@@ -492,7 +546,7 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 		newUser = false
 	}
 
-	apiUrl := "http://gorse:8088/api/recommend/" + reqBody.UserId + "/" + reqBody.Category + "?write-back-type=" + reqBody.WriteBackType + "&write-back-delay=" + strconv.Itoa(reqBody.DelayMins) + "m&n=" + strconv.Itoa(reqBody.Length)
+	apiUrl := "http://localhost:8088/api/recommend/" + reqBody.UserId + "/" + reqBody.Category + "?write-back-type=" + reqBody.WriteBackType + "&write-back-delay=" + strconv.Itoa(reqBody.DelayMins) + "m&n=" + strconv.Itoa(reqBody.Length)
 
 	resp, statusCode := miscelaneous.GetRequest(apiUrl)
 
@@ -534,6 +588,7 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 		Category string `json:"category"`
 		Length   int    `json:"length"`
 		Platform string `json:"platform"`
+		Intent   string `json:"intent"`
 	}
 
 	bodyByte, bodyErr := io.ReadAll(r.Body)
@@ -558,15 +613,15 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (reqBody.UserId == "") || reqBody.Category == "" || reqBody.Length == 0 {
-		errBody := &ErrorSchema{"error", "user id, category, and recommendation length are required"}
+	if reqBody.UserId == "" || reqBody.Intent == "" || reqBody.Category == "" || reqBody.Length == 0 {
+		errBody := &ErrorSchema{"error", "userId, category, intent, platform and length are required"}
 		w.WriteHeader(http.StatusBadRequest)
 		errByte, _ := json.Marshal(errBody)
 		w.Write(errByte)
 		return
 	}
 
-	userApiUrl := "http://gorse:8088/api/user/" + reqBody.UserId
+	userApiUrl := "http://localhost:8088/api/user/" + reqBody.UserId
 
 	var newUser bool
 
@@ -581,7 +636,7 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 		}
 
 		platform := []string{reqBody.Platform}
-		createUserUrl := "http://gorse:8088/api/user"
+		createUserUrl := "http://localhost:8088/api/user"
 
 		data := &userSchema{UserId: reqBody.UserId, Labels: platform}
 		dataByte, _ := json.Marshal(data)
@@ -602,7 +657,7 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a client
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	gorse := client.NewGorseClient("http://localhost:8088", "")
 
 	recommendations, recErr := gorse.GetRecommend(context.TODO(), reqBody.UserId, reqBody.Category, reqBody.Length)
 
@@ -616,10 +671,11 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var recomendationsDetails []recommendationSchema
+	var recommendationIds []string
 
 	for _, rec := range recommendations {
 
-		apiUrl := "http://gorse:8088/api/item/" + rec
+		apiUrl := "http://localhost:8088/api/item/" + rec
 
 		resp, statusCode := miscelaneous.GetRequest(apiUrl)
 
@@ -635,7 +691,11 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 
 		json.Unmarshal(resp, &recomendationDetail)
 
-		recomendationsDetails = append(recomendationsDetails, recomendationDetail)
+		if miscelaneous.StringInSlice(strings.ToLower(reqBody.Intent), recomendationDetail.Labels) {
+			recomendationsDetails = append(recomendationsDetails, recomendationDetail)
+			recommendationIds = append(recommendationIds, rec)
+		}
+
 	}
 
 	miscelaneous.ErrorLogger(recErr)
@@ -649,7 +709,7 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	jsonResp := &SuccessSchema{"success", recommendations, recomendationsDetails, reqBody.UserId, newUser}
+	jsonResp := &SuccessSchema{"success", recommendationIds, recomendationsDetails, reqBody.UserId, newUser}
 	jsonStr, _ := json.Marshal(jsonResp)
 
 	w.Write(jsonStr)

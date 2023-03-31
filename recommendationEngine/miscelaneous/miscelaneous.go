@@ -77,3 +77,12 @@ func GetRequest(url string) ([]byte, int) {
 	return resBody, res.StatusCode
 
 }
+
+func StringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}

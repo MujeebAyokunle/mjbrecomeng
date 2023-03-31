@@ -24,5 +24,5 @@ func main() {
 	r := router.Router()
 	fmt.Println("Running at port ", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
-	fmt.Println("Running at port ", port)
+
 }
