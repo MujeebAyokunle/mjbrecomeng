@@ -36,7 +36,9 @@ type GorseItemSchema struct {
 	IsHidden   bool     `json:"isHidden"`
 	Categories []string `json:"categories"`
 	Timestamp  string   `json:"timeStamp"`
+	UserId     string   `json:"userId"`
 	Labels     []string `json:"labels"`
+	Platform   string   `json:"platform"`
 	Comment    string   `json:"comment"`
 }
 
@@ -225,19 +227,49 @@ func GorseAddItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a client
-	fmt.Println("http://gorse:8088")
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	// gorse := client.NewGorseClient("http://localhost:8088", "")
 
-	affected, _ := gorse.InsertItem(context.TODO(), client.Item{
-		ItemId:     reqBody.ItemId,
-		IsHidden:   reqBody.IsHidden,
-		Categories: reqBody.Categories,
-		Timestamp:  reqBody.Timestamp,
-		Labels:     loweCaseLabels,
-		Comment:    reqBody.Comment,
-	})
+	// affected, _ := gorse.InsertItem(context.TODO(), client.Item{
+	// 	ItemId:     reqBody.ItemId,
+	// 	IsHidden:   reqBody.IsHidden,
+	// 	Categories: reqBody.Categories,
+	// 	Timestamp:  reqBody.Timestamp,
+	// 	Labels:     loweCaseLabels,
+	// 	Comment:    reqBody.Comment,
+	// })
 
-	if affected.RowAffected < 1 {
+	// if affected.RowAffected < 1 {
+	// 	w.WriteHeader(http.StatusBadRequest)
+	// 	jsonResp := &ErrorSchema{"error", "Error saving item"}
+	// 	jsonStr, _ := json.Marshal(jsonResp)
+
+	// 	w.Write(jsonStr)
+	// 	return
+	// }
+
+	type reqBodySchema struct {
+		ItemId     string
+		IsHidden   bool
+		Categories []string
+		Timestamp  string
+		Labels     []string
+		Comment    string
+	}
+
+	userApiUrl := "http://localhost:8088/api/item/"
+
+	data := &reqBodySchema{reqBody.ItemId, reqBody.IsHidden, reqBody.Categories, reqBody.Timestamp, loweCaseLabels, reqBody.Comment}
+
+	dataByte, _ := json.Marshal(data)
+	type responseStruct struct {
+		RowAffected int
+	}
+	rows, _ := miscelaneous.PostRequest(userApiUrl, dataByte)
+
+	var affectedRow responseStruct
+	json.Unmarshal(rows, &affectedRow)
+
+	if affectedRow.RowAffected < 1 {
 		w.WriteHeader(http.StatusBadRequest)
 		jsonResp := &ErrorSchema{"error", "Error saving item"}
 		jsonStr, _ := json.Marshal(jsonResp)
@@ -301,16 +333,53 @@ func GorseAddUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a client
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	// gorse := client.NewGorseClient("http://localhost:8088", "")
 
-	affected, _ := gorse.InsertUser(context.TODO(), client.User{
-		Labels: []string{reqBody.Platform},
-		UserId: reqBody.UserId,
-	})
+	// affected, _ := gorse.InsertUser(context.TODO(), client.User{
+	// 	Labels: []string{reqBody.Platform},
+	// 	UserId: reqBody.UserId,
+	// })
 
-	if affected.RowAffected < 1 {
+	// if affected.RowAffected < 1 {
+	// 	w.WriteHeader(http.StatusBadRequest)
+	// 	jsonResp := &ErrorSchema{"error", "Error saving user"}
+	// 	jsonStr, _ := json.Marshal(jsonResp)
+
+	// 	w.Write(jsonStr)
+	// 	return
+	// }
+
+	userApiUrl := "http://localhost:8088/api/user/" + reqBody.UserId
+
+	_, userStatusCode := miscelaneous.GetRequest(userApiUrl)
+
+	if userStatusCode != 200 {
+		type userSchema struct {
+			UserId    string
+			Comment   string
+			Labels    []string
+			Subscribe []string
+		}
+
+		platform := []string{reqBody.Platform}
+		createUserUrl := "http://localhost:8088/api/user"
+
+		data := &userSchema{UserId: reqBody.UserId, Labels: platform}
+		dataByte, _ := json.Marshal(data)
+		_, resStatusCode := miscelaneous.PostRequest(createUserUrl, dataByte)
+
+		if resStatusCode != 200 {
+			w.WriteHeader(http.StatusOK)
+			jsonResp := &ErrorSchema{"error", "Error adding user. User does not exist"}
+			jsonStr, _ := json.Marshal(jsonResp)
+
+			w.Write(jsonStr)
+			return
+		}
+
+	} else {
 		w.WriteHeader(http.StatusBadRequest)
-		jsonResp := &ErrorSchema{"error", "Error saving user"}
+		jsonResp := &ErrorSchema{"error", "Error adding user. User does not exist"}
 		jsonStr, _ := json.Marshal(jsonResp)
 
 		w.Write(jsonStr)
@@ -374,7 +443,7 @@ func GorseAddFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a client
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	gorse := client.NewGorseClient("http://localhost:8088", "")
 
 	affected, _ := gorse.InsertFeedback(context.TODO(), []client.Feedback{
 		{
@@ -447,7 +516,7 @@ func GorseRecommend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a client
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	gorse := client.NewGorseClient("http://localhost:8088", "")
 
 	recommendations, recErr := gorse.GetRecommend(context.TODO(), reqBody.UserId, reqBody.Category, reqBody.Length)
 
@@ -511,7 +580,7 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userApiUrl := "http://gorse:8088/api/user/" + reqBody.UserId
+	userApiUrl := "http://localhost:8088/api/user/" + reqBody.UserId
 
 	var newUser bool
 
@@ -526,7 +595,7 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 		}
 
 		platform := []string{reqBody.Platform}
-		createUserUrl := "http://gorse:8088/api/user"
+		createUserUrl := "http://localhost:8088/api/user"
 
 		data := &userSchema{UserId: reqBody.UserId, Labels: platform}
 		dataByte, _ := json.Marshal(data)
@@ -546,7 +615,7 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 		newUser = false
 	}
 
-	apiUrl := "http://gorse:8088/api/recommend/" + reqBody.UserId + "/" + reqBody.Category + "?write-back-type=" + reqBody.WriteBackType + "&write-back-delay=" + strconv.Itoa(reqBody.DelayMins) + "m&n=" + strconv.Itoa(reqBody.Length)
+	apiUrl := "http://localhost:8088/api/recommend/" + reqBody.UserId + "/" + reqBody.Category + "?write-back-type=" + reqBody.WriteBackType + "&write-back-delay=" + strconv.Itoa(reqBody.DelayMins) + "m&n=" + strconv.Itoa(reqBody.Length)
 
 	resp, statusCode := miscelaneous.GetRequest(apiUrl)
 
@@ -621,7 +690,7 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userApiUrl := "http://gorse:8088/api/user/" + reqBody.UserId
+	userApiUrl := "http://localhost:8088/api/user/" + reqBody.UserId
 
 	var newUser bool
 
@@ -636,7 +705,7 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 		}
 
 		platform := []string{reqBody.Platform}
-		createUserUrl := "http://gorse:8088/api/user"
+		createUserUrl := "http://localhost:8088/api/user"
 
 		data := &userSchema{UserId: reqBody.UserId, Labels: platform}
 		dataByte, _ := json.Marshal(data)
@@ -657,7 +726,7 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a client
-	gorse := client.NewGorseClient("http://gorse:8088", "")
+	gorse := client.NewGorseClient("http://localhost:8088", "")
 
 	recommendations, recErr := gorse.GetRecommend(context.TODO(), reqBody.UserId, reqBody.Category, reqBody.Length)
 
@@ -675,7 +744,7 @@ func GorseFullRecommend(w http.ResponseWriter, r *http.Request) {
 
 	for _, rec := range recommendations {
 
-		apiUrl := "http://gorse:8088/api/item/" + rec
+		apiUrl := "http://localhost:8088/api/item/" + rec
 
 		resp, statusCode := miscelaneous.GetRequest(apiUrl)
 
