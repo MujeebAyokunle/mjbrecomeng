@@ -377,6 +377,7 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 		Platform      string `json:"platform"`
 		DelayMins     int    `json:"delayMins"`
 		Length        int    `json:"length"`
+		Intent        string `json:"intent"`
 	}
 
 	bodyByte, bodyErr := io.ReadAll(r.Body)
@@ -457,11 +458,21 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 		w.Write(jsonStr)
 	}
 
+	type recommendationSchema struct {
+		Categories []string `json:"categories"`
+		Comment    string   `json:"comment"`
+		IsHidden   bool     `json:"isHidden"`
+		ItemId     string   `json:"itemId"`
+		Labels     []string `json:"labels"`
+		Timestamp  string   `json:"timestamp"`
+	}
+
 	type SuccessSchema struct {
-		Status          string   `json:"status"`
-		Recommendations []string `json:"recommendations"`
-		UserId          string   `json:"userid"`
-		NewUser         bool     `json:"newuser"`
+		Status                 string                 `json:"status"`
+		Recommendations        []string               `json:"recommendations"`
+		RecommendationsDetails []recommendationSchema `json:"recommendationsdetails"`
+		UserId                 string                 `json:"userid"`
+		NewUser                bool                   `json:"newuser"`
 	}
 
 	var recommendations []string
@@ -470,8 +481,36 @@ func GorseApiRecommend(w http.ResponseWriter, r *http.Request) {
 
 	miscelaneous.ErrorLogger(recErr)
 
+	var recomendationsDetails []recommendationSchema
+	var recommendationIds []string
+
+	for _, rec := range recommendations {
+
+		apiUrl := "http://gorseengine:8088/api/item/" + rec
+
+		resp, statusCode := miscelaneous.GetRequest(apiUrl)
+
+		if statusCode != 200 {
+			w.WriteHeader(http.StatusBadRequest)
+			jsonResp := &ErrorSchema{"error", "Error fetching recommendation details"}
+			jsonStr, _ := json.Marshal(jsonResp)
+
+			w.Write(jsonStr)
+		}
+
+		var recomendationDetail recommendationSchema
+
+		json.Unmarshal(resp, &recomendationDetail)
+
+		if miscelaneous.StringInSlice(strings.ToLower(reqBody.Intent), recomendationDetail.Labels) {
+			recomendationsDetails = append(recomendationsDetails, recomendationDetail)
+			recommendationIds = append(recommendationIds, rec)
+		}
+
+	}
+
 	w.WriteHeader(http.StatusOK)
-	jsonResp := &SuccessSchema{"success", recommendations, reqBody.UserId, newUser}
+	jsonResp := &SuccessSchema{"success", recommendationIds, recomendationsDetails, reqBody.UserId, newUser}
 	jsonStr, _ := json.Marshal(jsonResp)
 
 	w.Write(jsonStr)
