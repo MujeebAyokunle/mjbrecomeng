@@ -2,7 +2,7 @@ package miscelaneous
 
 import (
 	"bytes"
-	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -38,16 +38,11 @@ func PostRequest(url string, body []byte) ([]byte, int) {
 	}
 
 	defer res.Body.Close()
+	fmt.Println("body response", res.Body)
 
-	post := &Post{}
-	derr := json.NewDecoder(res.Body).Decode(post)
-	if derr != nil {
-		log.Fatal(derr)
-	}
+	body2, _ := io.ReadAll(res.Body)
 
-	resByte, _ := json.Marshal(post)
-
-	return resByte, res.StatusCode
+	return body2, res.StatusCode
 
 }
 

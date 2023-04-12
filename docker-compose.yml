@@ -1,0 +1,63 @@
+version: "3"
+services:
+  redis:
+    image: redis
+    restart: unless-stopped
+    command: redis-server --protected-mode no --bind 0.0.0.0
+    ports:
+      - 6379:6379
+    volumes:
+      - ./redis_data:/data
+    # networks:
+    #   - recommendationengine_net
+
+  mysql:
+    build: ./migrations/mysql
+    restart: unless-stopped
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: gorse
+      MYSQL_USER: gorse
+      MYSQL_PASSWORD: gorse_pass
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+
+  gorseengine:
+    image: zhenghaoz/gorse-in-one
+    restart: unless-stopped
+    ports:
+      - 8086:8086 # gRPC ports
+      - 8088:8088 # HTTP ports
+    environment:
+      # Use Redis as cache storage backend.
+      GORSE_CACHE_STORE: redis://redis:6379
+      # Use MySQL as data storage backend.
+      GORSE_DATA_STORE: mysql://gorse:gorse_pass@tcp(mysql:3306)/gorse?parseTime=true
+    command: >
+      -c /etc/gorse/config.toml   --log-path /var/log/gorse/master.log   --cache-path /var/lib/gorse/master_cache.data
+    volumes:
+      # Mount the configuration file.
+      - ./gorse/config.toml:/etc/gorse/config.toml
+    depends_on:
+      - mysql
+      - redis
+
+  recommendation:
+    build: ./recommendationEngine
+    restart: unless-stopped
+    volumes:
+      - ./recommendationEngine:/usr/src/app
+    ports:
+      - 6000:6000
+
+    depends_on:
+      - mysql
+      - redis
+
+volumes:
+  mysql_data:
+  redis_data:
+
+
