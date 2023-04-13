@@ -1,8 +1,4 @@
 .env
 
 main
-.dockerignore
 
-mysql_data
-
-redis_data
