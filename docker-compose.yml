@@ -3,10 +3,15 @@ services:
   redis:
     image: redis
     restart: unless-stopped
-    ports:
-      - 6379:6379
+    # ports:
+    #   - 6379:6379
+    expose:
+      - 6379
     volumes:
-      - ./redis_data:/data    
+      - ./redis_data:/data
+      - ./gorse/redis.conf:/usr/local/etc/redis/redis.conf
+    command: sh -c "redis-server /usr/local/etc/redis/redis.conf && redis-cli ping"
+    # redis-server --port 6379 
 
   mysql:
     build: ./migrations/mysql
