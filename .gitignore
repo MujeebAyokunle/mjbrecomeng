@@ -1,0 +1,6 @@
+recommendationEngine/.env
+
+recommendationEngine/main
+
+redis_data/
+mysql_data/
